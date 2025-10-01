@@ -2,8 +2,9 @@ using System;
 using System.Buffers.Binary;
 using System.Text;
 
-namespace cdr_cs;
+namespace Rclcs.Dds.Interop;
 
+// DDS レイヤーの最小文字列インタープ API を提供する。
 /// <summary>
 /// 文字列インタープの最小仕様インターフェース。
 /// - ワイヤ形式: [len: uint32][payload: UTF-8][0x00]

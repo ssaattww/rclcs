@@ -1,5 +1,5 @@
-using System.Text;
-using cdr_cs;
+using System;
+using Rclcs.Dds.Interop;
 
 // 最小TDD: まずは未実装APIを呼び出す失敗テストを用意する。
 // 目的: A1(String) の往復（Encode→Decode）で等価性を確認する。
@@ -25,8 +25,7 @@ class Program
     {
         try
         {
-            // 未実装API（IStringInterop/Utf8StringInterop）を先に参照
-            // 実装は次コミット以降で追加する想定。
+            // DDS 抽象レイヤープロジェクト（Rclcs.Dds）から実装を取得する。
             var interop = new Utf8StringInterop();
 
             // 正常系1: ASCII
@@ -51,11 +50,9 @@ class Program
     // 往復テスト（Encode→Decode）
     static void RoundTrip(IStringInterop interop, string input)
     {
-        // ここではUTF-8 + 先頭に長さ（仮）を想定しておくが、
-        // 具体仕様はA1-1で確定させる。
+        // 仕様に従ってエンコードし、復号結果を比較する。
         var encoded = interop.Encode(input);
         var decoded = interop.Decode(encoded);
         Assert.Equal(input, decoded, "RoundTrip mismatch");
     }
 }
-

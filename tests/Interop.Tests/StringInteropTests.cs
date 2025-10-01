@@ -1,7 +1,7 @@
 using System;
 using System.Linq;
 using System.Text;
-using cdr_cs;
+using Rclcs.Dds.Interop;
 using Xunit;
 
 namespace Interop.Tests;

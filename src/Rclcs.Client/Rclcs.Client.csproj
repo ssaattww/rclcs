@@ -1,12 +1,13 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <OutputType>Exe</OutputType>
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <RootNamespace>Rclcs.Client</RootNamespace>
+    <AssemblyName>Rclcs.Client</AssemblyName>
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="../../src/Rclcs.Dds/Rclcs.Dds.csproj" />
+    <ProjectReference Include="../Rclcs.Dds/Rclcs.Dds.csproj" />
   </ItemGroup>
 </Project>

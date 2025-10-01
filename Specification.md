@@ -36,12 +36,18 @@
 | 層（上→下） | 役割 | 代表的コンポーネント | 今回の位置づけ |
 | --- | --- | --- | --- |
 | アプリケーションレイヤ | 利用者が実装する ROS 2/C# アプリケーション | C# アプリケーション、ROS 2 ノード | 利用者アプリ |
-| ROS 2 クライアントレイヤ | 上段: `rclcpp`/`rclpy` 等の言語別クライアント API。下段: `rcl` が共通のクライアントサポートを提供。 | `rclcpp`, `rclpy`, `rclc`, `rcl` | 将来的に `cdr_cs` が `rcl` 相当の C# 抽象を提供 |
-| DDS 抽象レイヤ | RMW インターフェースで DDS 実装差異を吸収し、CDR シリアライゼーション/タイプサポートを提供 | `rmw_*` パッケージ、OpenDDSharp、`cdr_cs` | 現タスク: OpenDDSharp + `cdr_cs` で抽象層を構築 |
+| ROS 2 クライアントレイヤ | 上段: `rclcpp`/`rclpy` 等の言語別クライアント API。下段: `rcl` が共通のクライアントサポートを提供。 | `rclcpp`, `rclpy`, `rclc`, `rcl` | 将来的に `Rclcs.Client` が `rcl` 相当の C# 抽象を提供 |
+| DDS 抽象レイヤ | RMW インターフェースで DDS 実装差異を吸収し、CDR シリアライゼーション/タイプサポートを提供 | `rmw_*` パッケージ、OpenDDSharp、`Rclcs.Dds` | 現タスク: OpenDDSharp + `Rclcs.Dds` で抽象層を構築 |
 | DDS 実装レイヤ | DDS プロトコルの実装本体 | OpenDDS、Cyclone DDS、Fast DDS など | 本計画では OpenDDS を採用 |
 | OS レイヤ | ネットワーク・プロセス基盤 | Linux、Windows など | 実行環境 |
 
 - OpenDDSharp は LGPL-3.0 ライセンス: <https://libraries.io/nuget/OpenDDSharp>
+
+### D. プロジェクト構成（2025-10-01 時点）
+
+- `src/Rclcs.Client`: ROS 2 クライアントレイヤの土台（API を今後整備）。
+- `src/Rclcs.Dds`: DDS 抽象レイヤの最小実装（文字列インタープ等）。
+- `tests/Interop.Tests`: レイヤー越しの相互運用テスト群。
 
 ## 2. 参照標準と設計ドキュメント
 

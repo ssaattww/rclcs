@@ -19,7 +19,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="../../cdr_cs.csproj" />
+    <ProjectReference Include="../../src/Rclcs.Dds/Rclcs.Dds.csproj" />
   </ItemGroup>
 </Project>
 
