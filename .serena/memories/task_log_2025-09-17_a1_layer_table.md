@@ -1,0 +1,1 @@
+2025-09-17: 仕様書にOSS DDS前提のレイヤー表を追加。最上段アプリ→最下段OSの順に並べ、ROS 2クライアント層のrclcpp/rclpyとrclの位置を明示。OpenDDSharpがLGPL-3.0であるURLを添付し、cdr_csがDDS抽象レイヤで役割を担うことを追記。

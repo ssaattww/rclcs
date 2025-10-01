@@ -85,7 +85,7 @@
   - GitHub操作: 「github-mcp-server」（`github__*` ツール）を使用（PR/Issue/レビュー/ラベル/マージ/リリース等）。
   - ブランチ作成ポリシー（remote-first, github-mcp 統一）:
     - 1) `github__create_branch` で GitHub 上にブランチを作成
-    - 2) ローカル同期: `git fetch cdr_cs` → `git checkout -t cdr_cs/<branch>`（以後、このブランチで作業開始）
+    - 2) ローカル同期: `git fetch rclcs` → `git checkout -t rclcs/<branch>`（以後、このブランチで作業開始）
     - 3) 以後の変更はローカルでコミットし、`git push` で同期（ドキュメントでも `github__push_files` は使用しない）
     - 4) PR作成（マージはユーザー）。マージ後は自動削除設定（Automatically delete head branches）を推奨。
 - `push` について:
@@ -96,7 +96,7 @@
 - コミットメッセージは下記
 [... omitted 0 of 182 lines ...]
 
-  - `git fetch cdr_cs` → `git checkout <branch>` → `git reset --hard cdr_cs/<branch>`。
+  - `git fetch rclcs` → `git checkout <branch>` → `git reset --hard rclcs/<branch>`。
 - 混在注意: `github__push_files` は使用しないため混在は発生しない。過去の履歴で混在がある場合は `git fetch` / `git reset --hard` で整合を取る。
 - 乖離チェック: 次の作業前に `git status -sb` で upstream 乖離がないことを確認。
 
@@ -150,7 +150,10 @@
 5. Python 公式実装で相互検証（必要に応じて `mcap info`/読取スクリプト）
 6. `write_memory` にタスク要約＋検証ログを記録
 7. `think_about_whether_you_are_done` で完了確認
-<<<<<<< HEAD
 
-=======
->>>>>>> a3a4b86 (docs: github__push_files を全面禁止し、remote-firstブランチ作成運用を明記)
+## テストフレームワーク（xUnit）
+- 既定: xUnit.net を使用する。コンソールRunnerは使用しない。
+- 配置: `tests/<Name>.Tests` ディレクトリ（例: `tests/Interop.Tests`）。
+- 依存: `Microsoft.NET.Test.Sdk`, `xunit`, `xunit.runner.visualstudio`（必要に応じ `coverlet.collector`）。
+- 実行: `dotnet test rclcs.sln`（ネットワーク制限下では実行を保留し、CI/ローカルで復元・実行）。
+- 設計: Fact/Theory を用いたTDD、外部依存の最小化、テスト名は日本語可（意図を明確に）。

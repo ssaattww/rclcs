@@ -29,6 +29,26 @@
 
 ---
 
+### C. レイヤー構造（OSS DDS 前提）
+
+以下は最上段をアプリケーション、最下段を OS とした階層構造。ROS 2 クライアント層では、上段に各言語のクライアントライブラリ、下段に C 言語の `rcl` が位置する。参考: <https://docs.ros.org/en/rolling/Concepts/Basic/About-Client-Libraries.html> / <https://docs.ros.org/en/rolling/Concepts/Advanced/About-Middleware-Implementations.html>
+
+| 層（上→下） | 役割 | 代表的コンポーネント | 今回の位置づけ |
+| --- | --- | --- | --- |
+| アプリケーションレイヤ | 利用者が実装する ROS 2/C# アプリケーション | C# アプリケーション、ROS 2 ノード | 利用者アプリ |
+| ROS 2 クライアントレイヤ | 上段: `rclcpp`/`rclpy` 等の言語別クライアント API。下段: `rcl` が共通のクライアントサポートを提供。 | `rclcpp`, `rclpy`, `rclc`, `rcl` | 将来的に `Rclcs.Client` が `rcl` 相当の C# 抽象を提供 |
+| DDS 抽象レイヤ | RMW インターフェースで DDS 実装差異を吸収し、CDR シリアライゼーション/タイプサポートを提供 | `rmw_*` パッケージ、OpenDDSharp、`Rclcs.Dds` | 現タスク: OpenDDSharp + `Rclcs.Dds` で抽象層を構築 |
+| DDS 実装レイヤ | DDS プロトコルの実装本体 | OpenDDS、Cyclone DDS、Fast DDS など | 本計画では OpenDDS を採用 |
+| OS レイヤ | ネットワーク・プロセス基盤 | Linux、Windows など | 実行環境 |
+
+- OpenDDSharp は LGPL-3.0 ライセンス: <https://libraries.io/nuget/OpenDDSharp>
+
+### D. プロジェクト構成（2025-10-01 時点）
+
+- `src/Rclcs.Client`: ROS 2 クライアントレイヤの土台（API を今後整備）。
+- `src/Rclcs.Dds`: DDS 抽象レイヤの最小実装（文字列インタープ等）。
+- `tests/Interop.Tests`: レイヤー越しの相互運用テスト群。
+
 ## 2. 参照標準と設計ドキュメント
 
 - Connext .NET API: <https://community.rti.com/static/documentation/connext-dds/current/doc/api/connext_dds/api_csharp/index.html>  
@@ -106,7 +126,45 @@
 - ノード/パラメータ/グラフ情報は**自動では見えない**。  
 - ツール（`ros2 node list` 等）への露出は限定的（データ平面のみ）。
 
+### 4.6 A1: Minimal Interop (String) — ワイヤ形式
+- エンコード: UTF-8（BOMなし）
+- 長さヘッダ: 32ビット符号なし整数（4バイト）。値は「UTF-8バイト数 + 終端NUL(1バイト)」。
+- 配置: `[len:4B][payload:len-1B][0x00]`。ヘッダは4B境界に整列。
+- エンディアン: CDRカプセル化の指定に追従（A1の最小実装では Little Endian を既定）。
+- 検証/エラー: デコード時に以下を検証し、不一致は例外とする。
+  - バッファ長が `4 + len` 以上であること
+  - `payload` 末尾に `0x00`（NUL）が存在すること
+  - `payload`（`len-1`バイト）が厳格UTF-8として復元可能であること
+
+例（Little Endian）
+- "hello": 文字列長=5, バイト列=`68 65 6c 6c 6f` → len=6 →
+  `06 00 00 00  68 65 6c 6c 6f 00`
+- "ほげ": UTF-8=`E3 81 BB E3 81 92`（6バイト）→ len=7 →
+  `07 00 00 00  E3 81 BB E3 81 92 00`
+
+備考
+- 本仕様は ROS 2 の CDR 文字列表現（長さに終端NULを含む）に整合する。将来的にエンディアンはカプセル化フラグで切替予定。
+
 ---
+
+#### 参考と出典（短い原文引用）
+- CDR（CORBA）文字列の長さとNUL含有  
+  引用: "Strings are encoded as an unsigned long that indicates the length, including its terminating NUL byte."  
+  出典: Advanced CORBA Programming with C++（CDR の定義解説）  
+  参照: https://ebin.pub/advanced-corba-programming-with-c-0201379279-9780201379273.html
+
+- DDS-XTypes（NUL含有の明示）  
+  引用: "including the terminating NUL character."（コミュニティでの仕様引用）  
+  参照: https://github.com/ros2/rmw_cyclonedds/issues/43  
+  原典PDF: https://www.omg.org/spec/DDS-XTypes/1.3/PDF#page=28 （7.2.2.1.2.4 String<Char8> type）
+
+- Fast-CDR の直列化（NUL終端文字列）  
+  引用: "serializes a null-terminated string."（`Cdr::operator<<(const char*)` 説明）  
+  参照: https://docs.ros.org/en/melodic/api/fastcdr/html/classeprosima_1_1fastcdr_1_1Cdr.html （ページ内の “operator<< (const char* string_t)” を参照）
+
+- ROS 2 Fast RTPS TypeSupport 実装例（4B整列と +1[NUL]）  
+  例: `current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);` → https://docs.ros.org/en/ros2_packages/humble/api/rmw_fastrtps_dynamic_cpp/generated/TypeSupport__impl_8hpp_source.html#l308  
+  例: 上限チェックで `string_upper_bound_ + 1`（NULを含める） → https://docs.ros.org/en/ros2_packages/humble/api/rmw_fastrtps_dynamic_cpp/generated/TypeSupport__impl_8hpp_source.html#l136
 
 ## 5. アプローチ B の仕様（Connext 上で C# クライアント語彙を再現）
 
