@@ -1,4 +1,4 @@
-# 仕様書: C# から ROS 2 と相互通信するための 2 アプローチ（RTI Connext 利用）
+# 仕様書: C# から ROS 2 と相互通信するための 2 アプローチ（OpenDDS 利用）
 
 最終更新: 2025-09-14（JST）
 
@@ -8,7 +8,7 @@
 
 - **目的**  
   - C#（.NET）アプリが、ROS 2 システムと**トピックレベルで相互通信**できるようにする。  
-  - 自作 P/Invoke を書かずに、**RTI Connext の公式 .NET API** または **RTI Connector for .NET** を用いる。
+  - 自作 P/Invoke を書かずに、**OpenDDS の .NET バインディング（OpenDDSharp）** を用いる。
 
 - **非目的（当初スコープ外）**  
   - ROS 2 ノード/グラフAPI/パラメータ/サービス/アクションの完全再現。  
@@ -19,13 +19,13 @@
 ## 1. アプローチ概要
 
 ### A. 純DDSインタープ（ROS層をバイパス）
-- C# から **Connext .NET API (`Rti.ConnextDds`)** もしくは **RTI Connector for .NET** を使用。  
-- ROS 2 側（RMW が Fast DDS / Cyclone DDS / Connext のいずれでも）と、**DDS の相互運用**によりデータ平面で通信。  
+- C# から **OpenDDSharp（OpenDDS を .NET から扱うラッパー）** を使用。  
+- ROS 2 側（RMW が Fast DDS / Cyclone DDS / Connext / OpenDDS など）と、**DDS の相互運用**によりデータ平面で通信。  
 - 成功条件は **(1) 同一の型定義 (IDL)**、**(2) トピック名のマッピング準拠**、**(3) QoS 整合**。
 
-### B. “C#版クライアントライブラリ”を Connext 上に実装
-- Connext の Publisher/Subscriber/Request-Reply を足場に、**C# 側で ROS 2 の語彙（ノード/パラメータ/サービス/アクション等）を再現**。  
-- A を実証・安定化後、段階的に B を整備（長期ロードマップ）。
+### B. “C#版クライアントライブラリ”を OpenDDS 上に実装
+- OpenDDS の Publisher/Subscriber/Request-Reply を足場に、**C# 側で ROS 2 の語彙（ノード/パラメータ/サービス/アクション等）を再現**。  
+- `rmw_opendds` の設計・挙動を参考にしつつ、A を実証・安定化後に段階的に B を整備（長期ロードマップ）。
 
 ---
 
@@ -51,21 +51,21 @@
 
 ## 2. 参照標準と設計ドキュメント
 
-- Connext .NET API: <https://community.rti.com/static/documentation/connext-dds/current/doc/api/connext_dds/api_csharp/index.html>  
-- RTI Connector for .NET: <https://rticommunity.github.io/rticonnextdds-connector-cs/>（API概要: <https://rticommunity.github.io/rticonnextdds-connector-cs/articles/api_overview.html>）  
+- OpenDDS マニュアル: <https://opendds.readthedocs.io/en/latest/>  
+- OpenDDSharp リポジトリ: <https://github.com/objectcomputing/OpenDDSharp>  
+- rmw_opendds: <https://github.com/ros2/rmw_opendds>  
 - ROS 2: Topic/Service 名の DDS マッピング: <https://design.ros2.org/articles/topic_and_service_names.html>  
-- RMW Connext 実装（参考）: <https://github.com/ros2/rmw_connextdds> / <https://index.ros.org/p/rmw_connextdds/>  
+- RMW OpenDDS 実装（参考）: <https://docs.ros.org/en/rolling/p/rmw_opendds/>  
 - DDS を ROS 2 下で使う背景: <https://design.ros2.org/articles/ros_on_dds.html>
 
 ---
 
 ## 3. 共通要件（A/B に共通）
 
-### 3.1 型定義（IDL）とコード生成
 - ROS 2 の `.msg/.idl` と**同一レイアウトの DDS IDL**を用意すること。  
 - 生成方法（いずれか）  
-  - `rtiddsgen` による **IDL → C# 型生成**  
-  - **Dynamic Data API** を用い、XML/IDL でランタイム登録  
+  - OpenDDS の IDL コンパイラ `opendds_idl` による **IDL → C++ 型生成** を行い、OpenDDSharp 既定の C# ラッパーを利用  
+  - **OpenDDSharp の DynamicType API** を用い、IDL 由来の TypeObject をランタイム登録  
 - **互換性原則**  
   - フィールド順・型幅・可変長/配列指定を厳密に一致。  
   - `builtin_interfaces` 等の標準型は既存 IDL を再利用（改変禁止）。
@@ -77,14 +77,14 @@
 - サービス/アクションを扱う場合は、Request/Reply トピック命名規約に従う。
 
 ### 3.3 QoS 整合（推奨初期値）
-| 項目 | ROS 2 既定の目安 | Connext 側指定例 |
+| 項目 | ROS 2 既定の目安 | OpenDDS/OpenDDSharp 設定例 |
 |---|---|---|
-| Reliability | Reliable | `ReliabilityKind.Reliable` |
-| Durability | Volatile | `DurabilityKind.Volatile` |
-| History | KeepLast(depth=10) | `HistoryKind.KeepLast`, depth=10 |
-| Deadline | 未指定 | `Duration.Infinite` |
-| Lifespan | 未指定 | 必要に応じ設定 |
-| Liveliness | Automatic | `LivelinessKind.Automatic` |
+| Reliability | Reliable | `ReliabilityQosPolicyKind.RELIABLE_RELIABILITY_QOS` |
+| Durability | Volatile | `DurabilityQosPolicyKind.VOLATILE_DURABILITY_QOS` |
+| History | KeepLast(depth=10) | `HistoryQosPolicyKind.KEEP_LAST_HISTORY_QOS`, depth=10 |
+| Deadline | 未指定 | `Duration.Infinite`（`TimeValue.Zero` を指定しない） |
+| Lifespan | 未指定 | 必要に応じ `LifespanQosPolicy` を設定 |
+| Liveliness | Automatic | `LivelinessQosPolicyKind.AUTOMATIC_LIVELINESS_QOS` |
 
 > 注意: 実際の既定は RMW/型/ツール（`ros2 topic pub/echo` 等）で差異があるため、通信相手の QoS を確認して合わせること。
 
@@ -101,9 +101,9 @@
 ## 4. アプローチ A の仕様（純DDSインタープ）
 
 ### 4.1 依存関係
-- NuGet: `Rti.ConnextDds`（.NET API）  
-  - NuGet パッケージ: <https://www.nuget.org/packages/Rti.ConnextDds>  
-- または RTI Connector for .NET（DLL + XML 設定）
+- NuGet: `OpenDDSharp`（OpenDDS 向け .NET バインディング）  
+  - NuGet パッケージ: <https://www.nuget.org/packages/OpenDDSharp>  
+- もしくは OpenDDS ネイティブツールチェーン（`opendds_idl`, `dcpsinfo_repo` など）
 
 ### 4.2 構成要素
 - `DomainParticipant`、`Topic<T>`、`DataWriter<T>`、`DataReader<T>` で構成。  
@@ -166,7 +166,7 @@
   例: `current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);` → https://docs.ros.org/en/ros2_packages/humble/api/rmw_fastrtps_dynamic_cpp/generated/TypeSupport__impl_8hpp_source.html#l308  
   例: 上限チェックで `string_upper_bound_ + 1`（NULを含める） → https://docs.ros.org/en/ros2_packages/humble/api/rmw_fastrtps_dynamic_cpp/generated/TypeSupport__impl_8hpp_source.html#l136
 
-## 5. アプローチ B の仕様（Connext 上で C# クライアント語彙を再現）
+## 5. アプローチ B の仕様（OpenDDS 上で C# クライアント語彙を再現）
 
 ### 5.1 目的
 - C# だけで ROS 2 に近い開発体験を提供（ノード、パラメータ、サービス/アクション、タイマー等）。
@@ -178,7 +178,7 @@
 - **グラフ情報**: ROS 2 内部のメタトピックを購読し、C# 側でビューを構築（段階導入）
 
 ### 5.3 互換性・参照
-- RMW Connext 実装（`rmw_connextdds`）の命名/QoS/型の扱いを参照。  
+- RMW OpenDDS 実装（`rmw_opendds`）の命名/QoS/型の扱いを参照。  
 - 公式リリースに合わせ、ディストリごとの差分（型記述/ハッシュなど）が出た場合は追従。
 
 ### 5.4 品質/配布
@@ -191,8 +191,8 @@
 ## 6. ビルド・デプロイ・運用
 
 - **ビルド**:  
-  - Connext .NET API → 通常の `dotnet build`。  
-  - RTI Connector → XML 設計ファイルを同梱し、ランタイムにロード。  
+  - OpenDDSharp → 通常の `dotnet build` で利用可能。  
+  - OpenDDS ネイティブ導入時は `opendds_idl` などの生成物をビルド後に配置。  
 - **運用**:  
   - Domain/Discovery 設定を運用環境でプロファイル化（XML QoS プロファイル）。  
   - コンテナ/VM 配布では、ライセンスとネイティブ依存（ランタイム）配置に留意。
@@ -203,7 +203,7 @@
 
 - **単体**: 型のシリアル化/デシリアル化、可変長/配列境界、NaN/Inf。  
 - **相互運用**:  
-  - RMW = Fast DDS / Cyclone DDS / Connext の ROS 2 と往復通信。  
+  - RMW = Fast DDS / Cyclone DDS / OpenDDS / Connext の ROS 2 と往復通信。  
   - 複数 QoS 組合せ（信頼性/歴史/デッドライン等）。  
 - **負荷**: 高頻度トピック、スループット、レイテンシ、ロス率。  
 - **長期**: Discovery 再参加、ネットワーク切断/復旧、Participant 再生成。
@@ -234,9 +234,9 @@
 
 ## 10. 参考リンク（抜粋）
 
-- Connext .NET API: <https://community.rti.com/static/documentation/connext-dds/current/doc/api/connext_dds/api_csharp/index.html>  
-- RTI Connector for .NET: <https://rticommunity.github.io/rticonnextdds-connector-cs/>  
+- OpenDDS マニュアル: <https://opendds.readthedocs.io/en/latest/>  
+- OpenDDSharp サンプル: <https://github.com/objectcomputing/OpenDDSharp/tree/master/examples>  
 - ROS 2 名称マッピング: <https://design.ros2.org/articles/topic_and_service_names.html>  
-- RMW Connext: <https://github.com/ros2/rmw_connextdds> / <https://index.ros.org/p/rmw_connextdds/>  
+- RMW OpenDDS: <https://github.com/ros2/rmw_opendds> / <https://docs.ros.org/en/rolling/p/rmw_opendds/>  
 - DDS 採用背景（ROS on DDS）: <https://design.ros2.org/articles/ros_on_dds.html>  
-- RTI Blog（ROS 2 × DDS 事例）: <https://www.rti.com/blog/ros-2-and-dds-interoperability-drives-next-generation-robotics>
+- OpenDDS セキュリティ ガイド: <https://opendds.readthedocs.io/en/latest/security/security.html>
